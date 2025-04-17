@@ -1,0 +1,27 @@
+<div class="status-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>GitHub Integration</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div *ngIf="isLoading" class="loading">
+        <mat-spinner diameter="50"></mat-spinner>
+        <p>Processing authentication...</p>
+      </div>
+      
+      <div *ngIf="!isLoading && isSuccess" class="success">
+        <mat-icon color="primary">check_circle</mat-icon>
+        <h2>Successfully Connected!</h2>
+        <p>You have successfully connected your GitHub account.</p>
+        <p>Redirecting to dashboard...</p>
+      </div>
+      
+      <div *ngIf="!isLoading && !isSuccess" class="error">
+        <mat-icon color="warn">error</mat-icon>
+        <h2>Authentication Failed</h2>
+        <p>{{ errorMessage }}</p>
+        <button mat-raised-button color="primary" routerLink="/">Try Again</button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

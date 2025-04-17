@@ -1,0 +1,14 @@
+<div class="remove-container">
+  <h3>Remove GitHub Integration</h3>
+  <p>Are you sure you want to remove the GitHub integration? This will delete all stored data.</p>
+  
+  <div class="actions">
+    <button mat-raised-button color="warn" (click)="removeIntegration()" [disabled]="isRemoving">
+      <mat-icon>delete</mat-icon>
+      Remove
+    </button>
+    <button mat-button (click)="cancel()">Cancel</button>
+  </div>
+  
+  <mat-progress-spinner *ngIf="isRemoving" mode="indeterminate" diameter="30"></mat-progress-spinner>
+</div>

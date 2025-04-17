@@ -1,0 +1,17 @@
+.remove-container {
+  padding: 16px;
+  
+  h3 {
+    margin-top: 0;
+  }
+  
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  
+  mat-progress-spinner {
+    margin: 16px auto 0;
+  }
+}
