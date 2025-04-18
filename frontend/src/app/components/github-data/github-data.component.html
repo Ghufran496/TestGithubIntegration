@@ -2,11 +2,13 @@
   <mat-toolbar color="primary">
     <span>GitHub Integration Dashboard</span>
     <span class="spacer"></span>
-    
+
     <div *ngIf="integrationStatus" class="integration-status">
       <mat-icon class="connected-icon">check_circle</mat-icon>
       <span>Connected as {{ integrationStatus.username }}</span>
-      <span class="sync-info">Last synced: {{ integrationStatus.lastSynced | date:'medium' }}</span>
+      <span class="sync-info"
+        >Last synced: {{ integrationStatus.lastSynced | date : "medium" }}</span
+      >
     </div>
   </mat-toolbar>
 
@@ -15,67 +17,108 @@
       <mat-card-header>
         <mat-card-title>GitHub Data</mat-card-title>
       </mat-card-header>
-      
+
       <mat-card-content>
         <div class="filters">
           <mat-form-field appearance="outline">
             <mat-label>Select Data</mat-label>
-            <mat-select [(ngModel)]="selectedCollection" (selectionChange)="onCollectionChange()">
-              <mat-option *ngFor="let collection of collections" [value]="collection.value">
+            <mat-select
+              [(ngModel)]="selectedCollection"
+              (selectionChange)="onCollectionChange()"
+            >
+              <mat-option
+                *ngFor="let collection of collections"
+                [value]="collection.value"
+              >
                 {{ collection.label }}
               </mat-option>
             </mat-select>
           </mat-form-field>
-          
+
+          <app-repo-selector
+            (repoSelected)="onRepoSelected($event)"
+            *ngIf="
+              selectedCollection === 'commits' ||
+              selectedCollection === 'pull-requests' ||
+              selectedCollection === 'issues'
+            "
+          ></app-repo-selector>
+
           <mat-form-field appearance="outline">
             <mat-label>Search</mat-label>
-            <input matInput [formControl]="searchControl" placeholder="Search...">
+            <input
+              matInput
+              [formControl]="searchControl"
+              placeholder="Search..."
+            />
             <mat-icon matSuffix>search</mat-icon>
           </mat-form-field>
-          
-          <button mat-raised-button color="accent" (click)="syncData()" [disabled]="isSyncing">
+
+          <button
+            mat-raised-button
+            color="accent"
+            (click)="syncData()"
+            [disabled]="isSyncing"
+          >
             <mat-icon>sync</mat-icon>
-            {{ isSyncing ? 'Syncing...' : 'Sync Data' }}
+            {{ isSyncing ? "Syncing..." : "Sync Data" }}
           </button>
         </div>
-        
+
         <div class="table-container">
           <div *ngIf="isLoading" class="loading-overlay">
             <mat-spinner diameter="50"></mat-spinner>
           </div>
-          
-          <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
+
+          <table
+            mat-table
+            [dataSource]="dataSource"
+            matSort
+            class="mat-elevation-z8"
+          >
             <!-- Dynamic columns -->
-            <ng-container *ngFor="let column of displayedColumns" [matColumnDef]="column">
-              <th mat-header-cell *matHeaderCellDef mat-sort-header> {{ column | titlecase }} </th>
-              <td mat-cell *matCellDef="let element"> 
-                {{ column === 'date' || column === 'createdAt' || column === 'updatedAt' ? 
-                   (element[column] | date:'medium') : element[column] }} 
+            <ng-container
+              *ngFor="let column of displayedColumns"
+              [matColumnDef]="column"
+            >
+              <th mat-header-cell *matHeaderCellDef mat-sort-header>
+                {{ column | titlecase }}
+              </th>
+              <td mat-cell *matCellDef="let element">
+                {{
+                  column === "date" ||
+                  column === "createdAt" ||
+                  column === "updatedAt"
+                    ? (element[column] | date : "medium")
+                    : element[column]
+                }}
               </td>
             </ng-container>
-            
+
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-            
+            <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+
             <!-- No data row -->
             <tr class="mat-row" *matNoDataRow>
               <td class="mat-cell" [attr.colspan]="displayedColumns.length">
-                No data available{{ searchControl.value ? ' for the search criteria' : '' }}
+                No data available{{
+                  searchControl.value ? " for the search criteria" : ""
+                }}
               </td>
             </tr>
           </table>
-          
-          <mat-paginator 
+
+          <mat-paginator
             [length]="totalItems"
             [pageSize]="pageSize"
             [pageSizeOptions]="pageSizeOptions"
             (page)="onPageChange($event)"
-            showFirstLastButtons>
+            aria-label="Select page">
           </mat-paginator>
         </div>
       </mat-card-content>
     </mat-card>
-    
+
     <mat-expansion-panel class="settings-panel">
       <mat-expansion-panel-header>
         <mat-panel-title>
@@ -83,7 +126,7 @@
           Integration Settings
         </mat-panel-title>
       </mat-expansion-panel-header>
-      
+
       <app-github-remove-integration></app-github-remove-integration>
     </mat-expansion-panel>
   </div>

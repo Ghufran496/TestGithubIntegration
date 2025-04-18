@@ -1,0 +1,8 @@
+<mat-form-field appearance="fill">
+  <mat-label>Select Repository</mat-label>
+  <mat-select [(ngModel)]="selectedRepo" (selectionChange)="onRepoChange()">
+    <mat-option *ngFor="let repo of repos" [value]="repo.name">{{
+      repo.name
+    }}</mat-option>
+  </mat-select>
+</mat-form-field>

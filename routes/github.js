@@ -27,4 +27,10 @@ router.get('/data/:collection', githubController.getData);
 // Get all collections for dropdown
 router.get('/collections', githubController.getCollections);
 
+// Fetch and store pull requests by repository ID
+router.get('/sync/repository-pulls/:repoId', githubController.syncPullsByRepoId);
+
+// Fetch and store issues by repository ID
+router.get('/sync/repository-issues/:repoId', githubController.syncIssuesByRepoId);
+
 module.exports = router;
