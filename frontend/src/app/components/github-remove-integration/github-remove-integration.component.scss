@@ -1,17 +1,43 @@
 .remove-container {
-  padding: 16px;
-  
-  h3 {
-    margin-top: 0;
-  }
-  
-  .actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 16px;
-  }
-  
-  mat-progress-spinner {
-    margin: 16px auto 0;
-  }
+  padding: 20px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.data-list {
+  margin: 15px 0;
+  padding-left: 20px;
+  list-style-type: none;
+}
+
+.data-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.data-list mat-icon {
+  margin-right: 10px;
+  color: #5c6bc0;
+  font-size: 20px;
+  height: 20px;
+  width: 20px;
+}
+
+.actions {
+  margin-top: 20px;
+  display: flex;
+  gap: 10px;
+}
+
+.removing-indicator {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.removing-indicator span {
+  color: #f44336;
+  font-weight: 500;
 }

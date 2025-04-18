@@ -94,7 +94,7 @@ const handleGithubCallback = async (req, res) => {
   }
 };
 
-// Remove integration
+// Remove integration and all associated data
 const removeIntegration = async (req, res) => {
   try {
     const userId = req.query.userId;
@@ -102,11 +102,28 @@ const removeIntegration = async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
     
-    await GithubIntegration.findOneAndDelete({ userId });
+    // Import all required models
+    const Organization = require('../models/organization');
+    const Repository = require('../models/repository');
+    const Commit = require('../models/commit');
+    const Pull = require('../models/pull');
+    const Issue = require('../models/issue');
+    const GithubUser = require('../models/user');
     
-    return res.status(200).json({ message: 'Integration removed successfully' });
+    // Delete all user data
+    await Promise.all([
+      GithubIntegration.findOneAndDelete({ userId }),
+      Organization.deleteMany({ userId }),
+      Repository.deleteMany({ userId }),
+      Commit.deleteMany({ userId }),
+      Pull.deleteMany({ userId }),
+      Issue.deleteMany({ userId }),
+      GithubUser.deleteMany({ userId })
+    ]);
+    
+    return res.status(200).json({ message: 'Integration and all associated data removed successfully' });
   } catch (error) {
-    console.error('Error removing integration:', error);
+    console.error('Error removing integration and data:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };

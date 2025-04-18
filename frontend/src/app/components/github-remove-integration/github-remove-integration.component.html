@@ -1,14 +1,26 @@
 <div class="remove-container">
   <h3>Remove GitHub Integration</h3>
-  <p>Are you sure you want to remove the GitHub integration? This will delete all stored data.</p>
+  <p>Are you sure you want to remove the GitHub integration? This will permanently delete all your data including:</p>
+  
+  <ul class="data-list">
+    <li><mat-icon>folder</mat-icon> Repositories</li>
+    <li><mat-icon>history</mat-icon> Commits</li>
+    <li><mat-icon>business</mat-icon> Organizations</li>
+    <li><mat-icon>merge_type</mat-icon> Pull Requests</li>
+    <li><mat-icon>bug_report</mat-icon> Issues</li>
+    <li><mat-icon>person</mat-icon> User Data</li>
+  </ul>
   
   <div class="actions">
     <button mat-raised-button color="warn" (click)="removeIntegration()" [disabled]="isRemoving">
-      <mat-icon>delete</mat-icon>
-      Remove
+      <mat-icon>delete_forever</mat-icon>
+      Remove All Data
     </button>
     <button mat-button (click)="cancel()">Cancel</button>
   </div>
   
-  <mat-progress-spinner *ngIf="isRemoving" mode="indeterminate" diameter="30"></mat-progress-spinner>
+  <div *ngIf="isRemoving" class="removing-indicator">
+    <mat-progress-spinner mode="indeterminate" diameter="30"></mat-progress-spinner>
+    <span>Deleting all data...</span>
+  </div>
 </div>
