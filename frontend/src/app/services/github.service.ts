@@ -40,6 +40,10 @@ export class GithubService {
 
   // Sync commits for a repository
   syncCommits(owner: string, repo: string): Observable<any> {
+    console.log('syncing commits');
+    console.log(owner,"ownereeeeeeee")
+    console.log(repo,"reppppp")
+
     const userId = this.authService.userId;
     return this.http.get(`${this.apiUrl}/sync/commits/${owner}/${repo}?userId=${userId}`);
   }
