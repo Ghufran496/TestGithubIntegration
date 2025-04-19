@@ -35,14 +35,24 @@
             </mat-select>
           </mat-form-field>
 
-          <app-repo-selector
-            (repoSelected)="onRepoSelected($event)"
-            *ngIf="
-              selectedCollection === 'commits' ||
-              selectedCollection === 'pull-requests' ||
-              selectedCollection === 'issues'
-            "
-          ></app-repo-selector>
+          <mat-form-field appearance="outline" *ngIf="selectedCollection === 'users'">
+            <mat-label>Select Organization</mat-label>
+            <mat-select [(ngModel)]="selectedOrg" (selectionChange)="syncUsers(selectedOrg)">
+              <mat-option *ngFor="let org of organizations" [value]="org.login || org.name">
+                {{ org.login || org.name }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" 
+            *ngIf="['commits', 'pulls', 'pull-requests', 'issues'].includes(selectedCollection)">
+            <mat-label>Select Repository</mat-label>
+            <mat-select [(ngModel)]="selectedRepo" (selectionChange)="syncSelectedData()">
+              <mat-option *ngFor="let repo of repositories" [value]="repo.fullName">
+                {{ repo.fullName }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
 
           <mat-form-field appearance="outline">
             <mat-label>Search</mat-label>
@@ -67,53 +77,38 @@
 
         <div class="table-container">
           <div *ngIf="isLoading" class="loading-overlay">
-            <mat-spinner diameter="50"></mat-spinner>
+            <mat-spinner diameter="40"></mat-spinner>
           </div>
+          
+          <div class="responsive-table-wrapper">
+            <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
+              <ng-container *ngFor="let column of displayedColumns" [matColumnDef]="column">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>{{ column | titlecase }}</th>
+                <td mat-cell *matCellDef="let element">
+                  <ng-container *ngIf="column === 'date' || column === 'created_at' || column === 'updated_at'">
+                    {{ element[column] | date:'medium' }}
+                  </ng-container>
+                  <ng-container *ngIf="column !== 'date' && column !== 'created_at' && column !== 'updated_at'">
+                    <span class="cell-content">{{ element[column] }}</span>
+                  </ng-container>
+                </td>
+              </ng-container>
 
-          <table
-            mat-table
-            [dataSource]="dataSource"
-            matSort
-            class="mat-elevation-z8"
-          >
-            <!-- Dynamic columns -->
-            <ng-container
-              *ngFor="let column of displayedColumns"
-              [matColumnDef]="column"
-            >
-              <th mat-header-cell *matHeaderCellDef mat-sort-header>
-                {{ column | titlecase }}
-              </th>
-              <td mat-cell *matCellDef="let element">
-                {{
-                  column === "date" ||
-                  column === "createdAt" ||
-                  column === "updatedAt"
-                    ? (element[column] | date : "medium")
-                    : element[column]
-                }}
-              </td>
-            </ng-container>
-
-            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-
-            <!-- No data row -->
-            <tr class="mat-row" *matNoDataRow>
-              <td class="mat-cell" [attr.colspan]="displayedColumns.length">
-                No data available{{
-                  searchControl.value ? " for the search criteria" : ""
-                }}
-              </td>
-            </tr>
-          </table>
-
-          <mat-paginator
+              <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+            </table>
+          </div>
+          
+          <div *ngIf="!isLoading && dataSource.data.length === 0" class="no-data-message">
+            No data found
+          </div>
+          
+          <mat-paginator 
+            *ngIf="totalItems > 0"
             [length]="totalItems"
             [pageSize]="pageSize"
             [pageSizeOptions]="pageSizeOptions"
-            (page)="onPageChange($event)"
-            aria-label="Select page">
+            (page)="onPageChange($event)">
           </mat-paginator>
         </div>
       </mat-card-content>

@@ -7,7 +7,6 @@ const Pull = require("../models/pull");
 const Issue = require("../models/issue");
 const GithubUser = require("../models/user");
 
-// Sync organizations
 const syncOrganizations = async (req, res) => {
   try {
     const userId = req.query.userId;
@@ -15,10 +14,7 @@ const syncOrganizations = async (req, res) => {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // Fetch organizations from GitHub
     const orgs = await githubRequest("/user/orgs", userId);
-    console.log(orgs, "orgsss");
-    // Store organizations in database
     const savedOrgs = [];
     for (const org of orgs) {
       const orgDetails = await githubRequest(`/orgs/${org.login}`, userId);
@@ -39,7 +35,6 @@ const syncOrganizations = async (req, res) => {
       savedOrgs.push(savedOrg);
     }
 
-    // Update last synced time
     await GithubIntegration.findOneAndUpdate(
       { userId },
       { lastSynced: new Date() }
@@ -52,7 +47,6 @@ const syncOrganizations = async (req, res) => {
   }
 };
 
-// Sync repositories for an organization
 const syncRepositories = async (req, res) => {
   try {
     const { orgName } = req.params;
@@ -62,16 +56,13 @@ const syncRepositories = async (req, res) => {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // Find organization
     const organization = await Organization.findOne({ name: orgName, userId });
     if (!organization) {
       return res.status(404).json({ error: "Organization not found" });
     }
 
-    // Fetch repositories from GitHub
     const repos = await githubRequest(`/orgs/${orgName}/repos`, userId);
 
-    // Store repositories in database
     const savedRepos = [];
     for (const repo of repos) {
       const savedRepo = await Repository.findOneAndUpdate(
@@ -98,7 +89,6 @@ const syncRepositories = async (req, res) => {
   }
 };
 
-// Sync commits for a repository
 const syncCommits = async (req, res) => {
   try {
     const { owner, repo } = req.params;
@@ -108,7 +98,6 @@ const syncCommits = async (req, res) => {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // Find repository
     const repository = await Repository.findOne({
       fullName: `${owner}/${repo}`,
       userId,
@@ -117,17 +106,23 @@ const syncCommits = async (req, res) => {
       return res.status(404).json({ error: "Repository not found" });
     }
 
-    // Fetch commits from GitHub
     const commits = await githubRequest(
       `/repos/${owner}/${repo}/commits`,
       userId
     );
 
-    // Store commits in database
+    // If no commits found
+    if (!commits || commits.length === 0) {
+      return res.status(200).json({ 
+        message: "Repository is empty (no commits yet)",
+        data: []
+      });
+    }
+
     const savedCommits = [];
     for (const commit of commits) {
       const savedCommit = await Commit.findOneAndUpdate(
-        { sha: commit.sha, userId },
+        { sha: commit.sha, repositoryId: repository.id, userId },
         {
           sha: commit.sha,
           message: commit.commit.message,
@@ -135,6 +130,7 @@ const syncCommits = async (req, res) => {
           authorEmail: commit.commit.author.email,
           date: new Date(commit.commit.author.date),
           repositoryId: repository.id,
+          repositoryName: repository.fullName, // Store repository name
           organizationId: repository.organizationId,
           userId,
         },
@@ -151,7 +147,6 @@ const syncCommits = async (req, res) => {
   }
 };
 
-// Sync pull requests for a repository
 const syncPulls = async (req, res) => {
   try {
     const { owner, repo } = req.params;
@@ -163,7 +158,6 @@ const syncPulls = async (req, res) => {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // Find repository
     const repository = await Repository.findOne({
       fullName: `${owner}/${repo}`,
       userId,
@@ -172,10 +166,8 @@ const syncPulls = async (req, res) => {
       return res.status(404).json({ error: "Repository not found" });
     }
 
-    // Fetch pull requests from GitHub
     const pulls = await githubRequest(`/repos/${owner}/${repo}/pulls`, userId);
 
-    // Store pull requests in database
     const savedPulls = [];
     for (const pull of pulls) {
       const savedPull = await Pull.findOneAndUpdate(
@@ -205,7 +197,6 @@ const syncPulls = async (req, res) => {
   }
 };
 
-// Sync issues for a repository
 const syncIssues = async (req, res) => {
   try {
     const { owner, repo } = req.params;
@@ -215,7 +206,6 @@ const syncIssues = async (req, res) => {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // Find repository
     const repository = await Repository.findOne({
       fullName: `${owner}/${repo}`,
       userId,
@@ -224,16 +214,13 @@ const syncIssues = async (req, res) => {
       return res.status(404).json({ error: "Repository not found" });
     }
 
-    // Fetch issues from GitHub
     const issues = await githubRequest(
       `/repos/${owner}/${repo}/issues`,
       userId
     );
 
-    // Store issues in database
     const savedIssues = [];
     for (const issue of issues) {
-      // Skip pull requests (they also appear in the issues endpoint)
       if (issue.pull_request) continue;
 
       const savedIssue = await Issue.findOneAndUpdate(
@@ -263,7 +250,6 @@ const syncIssues = async (req, res) => {
   }
 };
 
-// Sync users for an organization
 const syncUsers = async (req, res) => {
   try {
     const { orgName } = req.params;
@@ -275,16 +261,13 @@ const syncUsers = async (req, res) => {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // Find organization
     const organization = await Organization.findOne({ name: orgName, userId });
     if (!organization) {
       return res.status(404).json({ error: "Organization not found" });
     }
 
-    // Fetch users from GitHub
     const users = await githubRequest(`/orgs/${orgName}/members`, userId);
 
-    // Store users in database
     const savedUsers = [];
     for (const user of users) {
       const userDetails = await githubRequest(`/users/${user.login}`, userId);
@@ -314,7 +297,6 @@ const syncUsers = async (req, res) => {
   }
 };
 
-// Get data for a specific collection
 const getData = async (req, res) => {
   try {
     const { collection } = req.params;
@@ -341,7 +323,7 @@ const getData = async (req, res) => {
         model = Commit;
         break;
       case "pulls":
-      case "pull-requests":  // Add support for both pulls and pull-requests
+      case "pull-requests":
         model = Pull;
         break;
       case "issues":
@@ -354,14 +336,21 @@ const getData = async (req, res) => {
         return res.status(400).json({ error: "Invalid collection" });
     }
 
-    // Build search query
     let query = { userId };
-    
-    // Add repository filter if provided
-    if (repo && ['commits', 'pulls', 'pull-requests', 'issues'].includes(collection)) {
-      const repository = await Repository.findOne({ fullName: repo, userId });
-      if (repository) {
-        query.repositoryId = repository.id;
+
+    if (
+      repo &&
+      ["commits", "pulls", "pull-requests", "issues"].includes(collection)
+    ) {
+      if (collection === "commits") {
+        // For commits, use the repositoryName field directly
+        query.repositoryName = repo;
+      } else {
+        // For other collections, continue using the repository ID
+        const repository = await Repository.findOne({ fullName: repo, userId });
+        if (repository) {
+          query.repositoryId = repository.id;
+        }
       }
     }
 
@@ -385,15 +374,40 @@ const getData = async (req, res) => {
       }
     }
 
-    // Get total count for pagination
     const total = await model.countDocuments(query);
 
-    // Get data with pagination and sort by most recent first
     const data = await model
       .find(query)
       .skip(skip)
       .limit(limit)
-      .sort({ createdAt: -1, _id: -1 });
+      .sort({ date: -1, _id: -1 });
+
+    // For commits, group by repository in the response
+    if (collection === "commits" && !repo) {
+      // If no specific repo is selected, group commits by repository
+      const groupedData = {};
+      
+      for (const commit of data) {
+        const repoName = commit.repositoryName;
+        if (!groupedData[repoName]) {
+          groupedData[repoName] = [];
+        }
+        groupedData[repoName].push(commit);
+      }
+      
+      return res.status(200).json({
+        data: Object.keys(groupedData).map(repo => ({
+          repository: repo,
+          commits: groupedData[repo]
+        })),
+        pagination: {
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+        },
+      });
+    }
 
     return res.status(200).json({
       data,
@@ -410,7 +424,6 @@ const getData = async (req, res) => {
   }
 };
 
-// Get all collections for dropdown
 const getCollections = (req, res) => {
   const collections = [
     { value: "organizations", label: "Organizations" },
@@ -424,7 +437,6 @@ const getCollections = (req, res) => {
   return res.status(200).json(collections);
 };
 
-// Sync pull requests for a repository by repository ID
 const syncPullsByRepoId = async (req, res) => {
   try {
     const { repoId } = req.params;
@@ -434,7 +446,6 @@ const syncPullsByRepoId = async (req, res) => {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // Find repository by ID
     const repository = await Repository.findOne({
       id: parseInt(repoId),
       userId,
@@ -443,13 +454,10 @@ const syncPullsByRepoId = async (req, res) => {
       return res.status(404).json({ error: "Repository not found" });
     }
 
-    // Extract owner and repo from the repository's fullName
     const [owner, repo] = repository.fullName.split("/");
 
-    // Fetch pull requests from GitHub
     const pulls = await githubRequest(`/repos/${owner}/${repo}/pulls`, userId);
 
-    // Store pull requests in database
     const savedPulls = [];
     for (const pull of pulls) {
       const savedPull = await Pull.findOneAndUpdate(
@@ -479,7 +487,6 @@ const syncPullsByRepoId = async (req, res) => {
   }
 };
 
-// Sync issues for a repository by repository ID
 const syncIssuesByRepoId = async (req, res) => {
   try {
     const { repoId } = req.params;
@@ -489,7 +496,6 @@ const syncIssuesByRepoId = async (req, res) => {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // Find repository by ID
     const repository = await Repository.findOne({
       id: parseInt(repoId),
       userId,
@@ -498,19 +504,15 @@ const syncIssuesByRepoId = async (req, res) => {
       return res.status(404).json({ error: "Repository not found" });
     }
 
-    // Extract owner and repo from the repository's fullName
     const [owner, repo] = repository.fullName.split("/");
 
-    // Fetch issues from GitHub
     const issues = await githubRequest(
       `/repos/${owner}/${repo}/issues`,
       userId
     );
 
-    // Store issues in database
     const savedIssues = [];
     for (const issue of issues) {
-      // Skip pull requests (they also appear in the issues endpoint)
       if (issue.pull_request) continue;
 
       const savedIssue = await Issue.findOneAndUpdate(
@@ -540,7 +542,6 @@ const syncIssuesByRepoId = async (req, res) => {
   }
 };
 
-// Sync commits for a repository by repository ID
 const syncCommitsByRepoId = async (req, res) => {
   try {
     const { repoId } = req.params;
@@ -550,7 +551,6 @@ const syncCommitsByRepoId = async (req, res) => {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // Find repository by ID
     const repository = await Repository.findOne({
       id: parseInt(repoId),
       userId,
@@ -559,16 +559,13 @@ const syncCommitsByRepoId = async (req, res) => {
       return res.status(404).json({ error: "Repository not found" });
     }
 
-    // Extract owner and repo from the repository's fullName
     const [owner, repo] = repository.fullName.split("/");
 
-    // Fetch commits from GitHub
     const commits = await githubRequest(
       `/repos/${owner}/${repo}/commits`,
       userId
     );
 
-    // Store commits in database
     const savedCommits = [];
     for (const commit of commits) {
       const savedCommit = await Commit.findOneAndUpdate(

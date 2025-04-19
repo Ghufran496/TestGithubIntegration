@@ -48,7 +48,6 @@ import { MatDialog } from '@angular/material/dialog';
     MatExpansionModule,
     MatToolbarModule,
     GithubRemoveIntegrationComponent,
-    RepoSelectorComponent,
   ],
 })
 export class GithubDataComponent implements OnInit {
@@ -57,7 +56,10 @@ export class GithubDataComponent implements OnInit {
   collections: any[] = [];
   selectedCollection = 'organizations';
   selectedRepo: string = '';
-  selectedOrg: string = ''; // Add this property
+  selectedOrg: string = '';
+  organizations: any[] = [];
+  repositories: any[] = [];
+
   dataSource = new MatTableDataSource<any>([]);
   displayedColumns: string[] = [];
   totalItems = 0;
@@ -75,11 +77,10 @@ export class GithubDataComponent implements OnInit {
     private githubService: GithubService,
     private authService: AuthService,
     private router: Router,
-    private dialog: MatDialog  // Add this
+    private dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
-    // Single subscription to handle authentication
     const authSub = this.authService.isAuthenticated$
       .pipe(take(1))
       .subscribe((isAuthenticated) => {
@@ -88,7 +89,6 @@ export class GithubDataComponent implements OnInit {
           return;
         }
 
-        // Get integration status once
         const userId = this.authService.userId;
         if (userId) {
           this.authService
@@ -96,8 +96,6 @@ export class GithubDataComponent implements OnInit {
             .pipe(take(1))
             .subscribe((status) => {
               this.integrationStatus = status;
-
-              // Load collections after authentication is confirmed
               this.loadCollections();
             });
         }
@@ -105,7 +103,6 @@ export class GithubDataComponent implements OnInit {
 
     this.subscriptions.push(authSub);
 
-    // Set up search with subscription management
     const searchSub = this.searchControl.valueChanges
       .pipe(debounceTime(500), distinctUntilChanged())
       .subscribe((value) => {
@@ -116,7 +113,6 @@ export class GithubDataComponent implements OnInit {
   }
 
   ngOnDestroy(): void {
-    // Clean up all subscriptions
     this.subscriptions.forEach((sub) => sub.unsubscribe());
   }
 
@@ -145,31 +141,93 @@ export class GithubDataComponent implements OnInit {
     ) {
       repo = this.selectedRepo;
     }
-    
-    console.log('Loading page:', page); // Add this for debugging
-    
+
     this.githubService
       .getData(this.selectedCollection, page, this.pageSize, search, repo)
       .subscribe({
         next: (response) => {
-          this.dataSource.data = response.data;
-          this.totalItems = response.pagination.total;
-  
-          // Dynamically set columns based on the first item
-          if (response.data.length > 0) {
-            this.displayedColumns = Object.keys(response.data[0]).filter(
-              (key) => key !== '_id' && key !== '__v' && key !== 'userId'
-            );
+          // Handle the grouped commits data structure
+          if (this.selectedCollection === 'commits') {
+            if (repo) {
+              // If a specific repo is selected, display commits directly
+              this.dataSource.data = response.data;
+              
+              if (response.data.length > 0) {
+                // Add repository name as the first column
+                const columns = Object.keys(response.data[0]).filter(
+                  (key) => key !== '_id' && key !== '__v' && key !== 'userId'
+                );
+                
+                // Ensure repositoryName is the first column
+                this.displayedColumns = [
+                  'repositoryName',
+                  ...columns.filter(col => col !== 'repositoryName')
+                ];
+              } else {
+                this.displayedColumns = [];
+              }
+            } else {
+              // If no repo is selected, handle the grouped structure
+              if (Array.isArray(response.data) && response.data.length > 0 && response.data[0].repository) {
+                // Flatten the grouped data for display
+                const flattenedData: Array<Record<string, any>> = [];
+                response.data.forEach((repoGroup: { repository: string; commits: Array<Record<string, any>> }) => {
+                  if (repoGroup.commits && Array.isArray(repoGroup.commits)) {
+                    repoGroup.commits.forEach((commit: Record<string, any>) => {
+                      flattenedData.push({
+                        ...commit,
+                        repository: repoGroup.repository
+                      });
+                    });
+                  }
+                });
+                
+                this.dataSource.data = flattenedData;
+                
+                if (flattenedData.length > 0) {
+                  const columns = Object.keys(flattenedData[0]).filter(
+                    (key) => key !== '_id' && key !== '__v' && key !== 'userId'
+                  );
+                  
+                  // Ensure repository is the first column
+                  this.displayedColumns = [
+                    'repository',
+                    ...columns.filter(col => col !== 'repository')
+                  ];
+                } else {
+                  this.displayedColumns = [];
+                }
+              } else {
+                // Handle regular data format
+                this.dataSource.data = response.data;
+                
+                if (response.data.length > 0) {
+                  this.displayedColumns = Object.keys(response.data[0]).filter(
+                    (key) => key !== '_id' && key !== '__v' && key !== 'userId'
+                  );
+                } else {
+                  this.displayedColumns = [];
+                }
+              }
+            }
           } else {
-            this.displayedColumns = [];
+            // For other collections, use the standard approach
+            this.dataSource.data = response.data;
+            
+            if (response.data.length > 0) {
+              this.displayedColumns = Object.keys(response.data[0]).filter(
+                (key) => key !== '_id' && key !== '__v' && key !== 'userId'
+              );
+            } else {
+              this.displayedColumns = [];
+            }
           }
-  
+          
+          this.totalItems = response.pagination.total;
           this.isLoading = false;
-  
-          // Set up sorting and pagination
+
           setTimeout(() => {
             this.dataSource.sort = this.sort;
-            // Don't set paginator here as it will reset the page
           });
         },
         error: (error) => {
@@ -180,28 +238,89 @@ export class GithubDataComponent implements OnInit {
   }
 
   onCollectionChange(): void {
-    // Reset pagination
     if (this.paginator) {
       this.paginator.firstPage();
     }
 
-    // Show organization selector for users
+    // Clear the current data to show "No data found" while loading
+    this.dataSource.data = [];
+    this.displayedColumns = [];
+    this.totalItems = 0;
+
+    // Load appropriate data based on selection
     if (this.selectedCollection === 'users') {
-      this.openOrgSelectorDialog();
+      this.loadOrganizations();
+      // After loading organizations, check if we have any
+      if (this.organizations.length > 0) {
+        // Use the first organization if none is selected
+        if (!this.selectedOrg) {
+          this.selectedOrg = this.organizations[0].login || this.organizations[0].name;
+        }
+        // Load users data from the database
+        this.loadData(1);
+      }
     } else if (['commits', 'pulls', 'pull-requests', 'issues'].includes(this.selectedCollection)) {
-      this.openRepoSelectorDialog();
+      this.loadRepositories();
+      // After loading repositories, check if we have any
+      if (this.repositories.length > 0) {
+        // Use the first repository if none is selected
+        if (!this.selectedRepo) {
+          this.selectedRepo = this.repositories[0].fullName;
+        }
+        // Load data from the database
+        this.loadData(1);
+      }
     } else {
+      // For organizations and repositories, just load the data
       this.loadData(1);
     }
+  }
+
+  loadOrganizations(): void {
+    this.isLoading = true;
+    this.githubService.getOrganizationsForSelection().subscribe({
+      next: (orgs: any[]) => {
+        this.organizations = orgs;
+        this.isLoading = false;
+        if (orgs.length > 0) {
+          this.selectedOrg = orgs[0].login || orgs[0].name;
+          // Load users data after setting the organization
+          this.loadData(1);
+        }
+      },
+      error: (error: any) => {
+        console.error('Error loading organizations:', error);
+        this.isLoading = false;
+      },
+    });
+  }
+
+  loadRepositories(): void {
+    this.isLoading = true;
+    this.githubService.getRepositories().subscribe({
+      next: (response: any) => {
+        this.repositories = response.data || [];
+        this.isLoading = false;
+        if (this.repositories.length > 0) {
+          this.selectedRepo = this.repositories[0].fullName;
+          // Load data after setting the repository
+          this.loadData(1);
+        }
+      },
+      error: (error: any) => {
+        console.error('Error loading repositories:', error);
+        this.isLoading = false;
+      },
+    });
   }
 
   openOrgSelectorDialog(): void {
     const dialogRef = this.dialog.open(RepoSelectorComponent, {
       width: '400px',
-      data: { dataType: 'organizations' }
+      data: { dataType: 'organizations' },
     });
 
-    dialogRef.afterClosed().subscribe(result => {
+    dialogRef.afterClosed().subscribe((result) => {
       if (result) {
         this.selectedOrg = result;
         this.syncUsers(result);
@@ -219,22 +338,21 @@ export class GithubDataComponent implements OnInit {
       error: (error: any) => {
         console.error('Error syncing users:', error);
         this.isSyncing = false;
-      }
+      },
     });
   }
 
   openRepoSelectorDialog(): void {
     const dialogRef = this.dialog.open(RepoSelectorComponent, {
       width: '500px',
-      data: { dataType: this.selectedCollection }
+      data: { dataType: this.selectedCollection },
     });
 
-    dialogRef.afterClosed().subscribe(result => {
+    dialogRef.afterClosed().subscribe((result) => {
       if (result) {
         this.selectedRepo = result;
         this.syncSelectedData();
       } else {
-        // User canceled, reset collection selection
         this.selectedCollection = 'organizations';
       }
     });
@@ -244,13 +362,16 @@ export class GithubDataComponent implements OnInit {
     this.isSyncing = true;
     const orgName = this.selectedRepo.split('/')[0];
     const repoName = this.selectedRepo.split('/')[1];
-  
+
     switch (this.selectedCollection) {
       case 'commits':
         this.githubService.syncCommits(orgName, repoName).subscribe({
           next: (response) => {
             this.isSyncing = false;
-            if (response && response.message === 'Repository is empty (no commits yet)') {
+            if (
+              response &&
+              response.message === 'Repository is empty (no commits yet)'
+            ) {
               this.dataSource.data = [];
               this.displayedColumns = [];
               this.totalItems = 0;
@@ -264,10 +385,10 @@ export class GithubDataComponent implements OnInit {
             this.dataSource.data = [];
             this.displayedColumns = [];
             this.totalItems = 0;
-          }
+          },
         });
         break;
-  
+
       case 'pulls':
       case 'pull-requests':
         this.githubService.syncPulls(orgName, repoName).subscribe({
@@ -287,10 +408,10 @@ export class GithubDataComponent implements OnInit {
             this.dataSource.data = [];
             this.displayedColumns = [];
             this.totalItems = 0;
-          }
+          },
         });
         break;
-  
+
       case 'issues':
         this.githubService.syncIssues(orgName, repoName).subscribe({
           next: (response: any) => {
@@ -309,13 +430,13 @@ export class GithubDataComponent implements OnInit {
             this.dataSource.data = [];
             this.displayedColumns = [];
             this.totalItems = 0;
-          }
+          },
         });
         break;
     }
   }
 
-  onRepoSelected(event: any): void {  // Change parameter type from string to any
+  onRepoSelected(event: any): void {
     if (typeof event === 'string') {
       this.selectedRepo = event;
     } else if (event && event.target && event.target.value) {
@@ -328,40 +449,104 @@ export class GithubDataComponent implements OnInit {
     if (!this.selectedCollection) return;
 
     this.isSyncing = true;
-    if (this.selectedCollection === 'organizations') {
-      this.githubService.syncOrganizations().subscribe({
-        next: () => {
-          this.loadData();
-          this.isSyncing = false;
-        },
-        error: (error) => {
-          console.error('Error syncing organizations:', error);
-          this.isSyncing = false;
-        }
-      });
-    } else if (['commits', 'pulls', 'issues'].includes(this.selectedCollection)) {
-      if (!this.selectedRepo) {
-        this.openRepoSelectorDialog();
-      } else {
-        const [owner, repo] = this.selectedRepo.split('/');
-        const syncMethod = this.getSyncMethod();
-        if (syncMethod) {
-          syncMethod(owner, repo).subscribe({
-            next: () => {
-              this.loadData();
+    console.log(
+      'Starting sync process for collection:',
+      this.selectedCollection
+    );
+
+    this.githubService.syncOrganizations().subscribe({
+      next: (orgs: any[]) => {
+        console.log('Organizations sync response:', orgs);
+
+        if (orgs && orgs.length > 0) {
+          console.log(`Found ${orgs.length} organizations`);
+
+          if (this.selectedCollection === 'organizations') {
+            this.isSyncing = false;
+            this.loadData();
+            this.organizations = orgs;
+          } else if (this.selectedCollection === 'repositories') {
+            const orgName = this.selectedOrg || orgs[0].login || orgs[0].name;
+            console.log(
+              `Using organization: ${orgName} for syncing repositories`
+            );
+
+            this.githubService.syncRepositories(orgName).subscribe({
+              next: (repos: any[]) => {
+                console.log(`Synced ${repos.length} repositories`);
+                this.selectedOrg = orgName; // Save the selected org
+                this.isSyncing = false;
+                this.loadData();
+              },
+              error: (error: any) => {
+                console.error('Error syncing repositories:', error);
+                this.isSyncing = false;
+              },
+            });
+          } else if (this.selectedCollection === 'users') {
+            const orgName = this.selectedOrg || orgs[0].login || orgs[0].name;
+            console.log(`Using organization: ${orgName} for syncing users`);
+
+            this.githubService.syncUsers(orgName).subscribe({
+              next: (users: any[]) => {
+                console.log(`Synced ${users ? users.length : 0} users`);
+                this.selectedOrg = orgName;
+                this.isSyncing = false;
+                this.loadData();
+              },
+              error: (error: any) => {
+                console.error('Error syncing users:', error);
+                this.isSyncing = false;
+              },
+            });
+          } else if (
+            ['commits', 'pulls', 'pull-requests', 'issues'].includes(
+              this.selectedCollection
+            )
+          ) {
+            if (!this.selectedRepo) {
+              this.loadRepositories();
               this.isSyncing = false;
-            },
-            error: (error) => {
-              console.error(`Error syncing ${this.selectedCollection}:`, error);
-              this.isSyncing = false;
+            } else {
+              const [owner, repo] = this.selectedRepo.split('/');
+              const syncMethod = this.getSyncMethod();
+              if (syncMethod) {
+                syncMethod(owner, repo).subscribe({
+                  next: () => {
+                    this.loadData();
+                    this.isSyncing = false;
+                  },
+                  error: (error) => {
+                    console.error(
+                      `Error syncing ${this.selectedCollection}:`,
+                      error
+                    );
+                    this.isSyncing = false;
+                  },
+                });
+              } else {
+                this.isSyncing = false;
+              }
             }
-          });
+          } else {
+            this.isSyncing = false;
+            this.loadData();
+          }
+        } else {
+          console.log('No organizations found');
+          this.isSyncing = false;
         }
-      }
-    }
+      },
+      error: (error: any) => {
+        console.error('Error syncing organizations:', error);
+        this.isSyncing = false;
+      },
+    });
   }
 
-  private getSyncMethod(): ((owner: string, repo: string) => Observable<any>) | null {
+  private getSyncMethod():
+    | ((owner: string, repo: string) => Observable<any>)
+    | null {
     switch (this.selectedCollection) {
       case 'commits':
         return this.githubService.syncCommits.bind(this.githubService);
@@ -375,8 +560,8 @@ export class GithubDataComponent implements OnInit {
   }
 
   onPageChange(event: any): void {
-    const page = event.pageIndex + 1; // Convert zero-based index to one-based page number
+    const page = event.pageIndex + 1;
     this.pageSize = event.pageSize;
-    this.loadData(page); // Pass the page number to loadData
+    this.loadData(page);
   }
 }

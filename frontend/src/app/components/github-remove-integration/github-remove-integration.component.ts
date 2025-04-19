@@ -15,16 +15,13 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
     CommonModule,
     MatButtonModule,
     MatIconModule,
-    MatProgressSpinnerModule
-  ]
+    MatProgressSpinnerModule,
+  ],
 })
 export class GithubRemoveIntegrationComponent {
   isRemoving = false;
 
-  constructor(
-    private authService: AuthService,
-    private router: Router
-  ) { }
+  constructor(private authService: AuthService, private router: Router) {}
 
   removeIntegration(): void {
     this.isRemoving = true;
@@ -36,11 +33,9 @@ export class GithubRemoveIntegrationComponent {
       error: (error) => {
         console.error('Error removing integration:', error);
         this.isRemoving = false;
-      }
+      },
     });
   }
 
-  cancel(): void {
-    // Just close the panel
-  }
+  cancel(): void {}
 }

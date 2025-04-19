@@ -17,8 +17,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
     MatCardModule,
     MatIconModule,
     MatButtonModule,
-    MatProgressSpinnerModule
-  ]
+    MatProgressSpinnerModule,
+  ],
 })
 export class GithubIntegrationStatusComponent implements OnInit {
   isLoading = true;
@@ -29,22 +29,19 @@ export class GithubIntegrationStatusComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private authService: AuthService
-  ) { }
+  ) {}
 
   ngOnInit(): void {
     console.log('GitHub integration status component initialized');
-    this.route.queryParams.subscribe(params => {
+    this.route.queryParams.subscribe((params) => {
       console.log('Received query params:', params);
       const token = params['token'];
       const userId = params['userId'];
-      
+
       if (token && userId) {
-        console.log('Token and userId found in params, setting auth state');
-        // Set auth state without triggering status check
         this.authService.setAuthState(token, userId, false);
         this.isSuccess = true;
         setTimeout(() => {
-          console.log('Redirecting to data page');
           this.router.navigate(['/data']);
         }, 2000);
       } else {
@@ -52,7 +49,7 @@ export class GithubIntegrationStatusComponent implements OnInit {
         this.isSuccess = false;
         this.errorMessage = 'Authentication failed. Please try again.';
       }
-      
+
       this.isLoading = false;
     });
   }
